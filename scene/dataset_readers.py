@@ -21,6 +21,7 @@ import json
 from pathlib import Path
 from plyfile import PlyData, PlyElement
 from utils.sh_utils import SH2RGB
+from utils.image_utils import srgb2linear, linear2srgb
 from scene.gaussian_model import BasicPointCloud
 
 class CameraInfo(NamedTuple):
@@ -179,7 +180,7 @@ def readColmapSceneInfo(path, images, eval, llffhold=8):
                            ply_path=ply_path)
     return scene_info
 
-def readCamerasFromTransforms(path, transformsfile, white_background, extension=".png"):
+def readCamerasFromTransforms(path, transformsfile, white_background, extension=".png", linear=False):
     cam_infos = []
 
     with open(os.path.join(path, transformsfile)) as json_file:
@@ -217,6 +218,8 @@ def readCamerasFromTransforms(path, transformsfile, white_background, extension=
             bg = np.array([1,1,1]) if white_background else np.array([0, 0, 0])
 
             norm_data = im_data / 255.0
+            if linear:
+                norm_data = srgb2linear(im_data)
             arr = norm_data[:,:,:3] * norm_data[:, :, 3:4] + bg * (1 - norm_data[:, :, 3:4])
             image = Image.fromarray(np.array(arr*255.0, dtype=np.byte), "RGB")
             alpha_mask = norm_data[:, :, 3]
@@ -252,11 +255,11 @@ def readCamerasFromTransforms(path, transformsfile, white_background, extension=
             
     return cam_infos
 
-def readNerfSyntheticInfo(path, white_background, eval, extension=".png"):
+def readNerfSyntheticInfo(path, white_background, eval, extension=".png", linear=False):
     print("Reading Training Transforms")
-    train_cam_infos = readCamerasFromTransforms(path, "transforms_train.json", white_background, extension)
+    train_cam_infos = readCamerasFromTransforms(path, "transforms_train.json", white_background, extension, linear)
     print("Reading Test Transforms")
-    test_cam_infos = readCamerasFromTransforms(path, "transforms_test.json", white_background, extension)
+    test_cam_infos = readCamerasFromTransforms(path, "transforms_test.json", white_background, extension, linear)
     
     if not eval:
         train_cam_infos.extend(test_cam_infos)

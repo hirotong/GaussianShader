@@ -20,7 +20,7 @@ from utils.general_utils import safe_state
 from argparse import ArgumentParser
 from arguments import ModelParams, PipelineParams, get_combined_args
 from gaussian_renderer import GaussianModel
-from utils.image_utils import apply_depth_colormap
+from utils.image_utils import apply_depth_colormap, srgb2linear, linear2srgb
 from utils.general_utils import get_minimum_axis
 from scene.NVDIFFREC.util import save_image_raw
 import numpy as np
@@ -35,7 +35,7 @@ def render_lightings(model_path, name, iteration, gaussians, sample_num):
         torchvision.utils.save_image(lighting, os.path.join(lighting_path, '{0:05d}'.format(sampled_index) + ".png"))
         save_image_raw(os.path.join(lighting_path, '{0:05d}'.format(sampled_index) + ".hdr"), lighting.permute(1,2,0).detach().cpu().numpy())
 
-def render_set(model_path, name, iteration, views, gaussians, pipeline, background):
+def render_set(model_path, name, iteration, views, gaussians, pipeline, background, linear=False):
     render_path = os.path.join(model_path, name, "ours_{}".format(iteration), "renders")
     gts_path = os.path.join(model_path, name, "ours_{}".format(iteration), "gt")
 
@@ -50,8 +50,12 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
         torch.cuda.synchronize()
 
         gt = view.original_image[0:3, :, :]
-        torchvision.utils.save_image(render_pkg["render"], os.path.join(render_path, '{0:05d}'.format(idx) + ".png"))
-        torchvision.utils.save_image(gt, os.path.join(gts_path, '{0:05d}'.format(idx) + ".png"))
+        if linear:
+            torchvision.utils.save_image(linear2srgb(render_pkg["render"]), os.path.join(render_path, '{0:05d}'.format(idx) + ".png"))
+            torchvision.utils.save_image(linear2srgb(gt), os.path.join(gts_path, '{0:05d}'.format(idx) + ".png"))
+        else:    
+            torchvision.utils.save_image(render_pkg["render"], os.path.join(render_path, '{0:05d}'.format(idx) + ".png"))
+            torchvision.utils.save_image(gt, os.path.join(gts_path, '{0:05d}'.format(idx) + ".png"))
         for k in render_pkg.keys():
             if render_pkg[k].dim()<3 or k=="render" or k=="delta_normal_norm":
                 continue
@@ -74,10 +78,10 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
         background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
 
         if not skip_train:
-             render_set(dataset.model_path, "train", scene.loaded_iter, scene.getTrainCameras(), gaussians, pipeline, background)
+             render_set(dataset.model_path, "train", scene.loaded_iter, scene.getTrainCameras(), gaussians, pipeline, background, dataset.linear)
 
         if not skip_test:
-             render_set(dataset.model_path, "test", scene.loaded_iter, scene.getTestCameras(), gaussians, pipeline, background)
+             render_set(dataset.model_path, "test", scene.loaded_iter, scene.getTestCameras(), gaussians, pipeline, background, dataset.linear)
 
         if pipeline.brdf:
              render_lightings(dataset.model_path, "lighting", scene.loaded_iter, gaussians, sample_num=1)

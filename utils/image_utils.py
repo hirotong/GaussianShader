@@ -47,3 +47,11 @@ def erode(img_in, erode_size=4):
     img_out = cv2.erode(img_out, kernel, iterations=1)
 
     return img_out
+
+def srgb2linear(img):
+    img = torch.where(img <= 0.04045, img / 12.92, ((img + 0.055) / 1.055) ** 2.4)
+    return img
+
+def linear2srgb(img):
+    img = torch.where(img <= 0.0031308, 12.92 * img, 1.055 * (img ** (1.0 / 2.4)) - 0.055)
+    return img
