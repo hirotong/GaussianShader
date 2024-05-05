@@ -216,7 +216,7 @@ class EnvironmentLight(torch.nn.Module):
 
         F = _fresnel_schilick_roughness(torch.clamp(util.dot(wo, gb_normal), min=1e-4), F0, roughness)    
         kd = (1.0 - F) * (1.0 - metallic)       
-        diffuse_linear = ambient * albedo * kd
+        diffuse_linear = ambient * albedo * kd * torch.pi
 
         if specular:
             # Lookup FG term from lookup texture
