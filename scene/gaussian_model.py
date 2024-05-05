@@ -126,7 +126,7 @@ class GaussianModel:
 
     @property
     def get_diffuse(self):
-        return self._features_dc
+        return self.diffuse_activation(self._features_dc)
 
     @property
     def get_specular(self):
