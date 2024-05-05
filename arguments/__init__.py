@@ -106,6 +106,7 @@ class OptimizationParams(ParamGroup):
         self.normal_lr = 0.0002
         self.specular_lr = 0.0002
         self.roughness_lr = 0.0002
+        self.metallic_lr = 0.0002
         self.normal_reg_from_iter = 0
         self.normal_reg_util_iter = 30_000
         self.lambda_zero_one = 1e-3
