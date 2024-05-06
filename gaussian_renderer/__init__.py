@@ -201,7 +201,7 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
                     "diffuse_color": diffuse_color, 
                     "specular_color": specular_color, 
                     "color_delta": color_delta,  
-                    "metalic": metallic.repeat(1, 3),
+                    "metallic": metallic.repeat(1, 3),
                     "albedo": albedo, 
                     })
         

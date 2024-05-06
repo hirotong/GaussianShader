@@ -81,7 +81,7 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
             elif "normal" in k:
                 render_pkg[k] = 0.5 + (0.5 * render_pkg[k])
             torchvision.utils.save_image(render_pkg[k], os.path.join(save_path, "{0:05d}".format(idx) + ".png"))
-        keys = ["render", "albedo", "diffuse", "diffuse_color", "metallic", "specular", "specular_color"]
+        keys = ["render", "diffuse", "diffuse_color", "specular", "specular_color", "roughness", "albedo", "metallic"]
         concat_image = [gt]
         for key in keys:
             if key in render_pkg.keys():
