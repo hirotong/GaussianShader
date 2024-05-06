@@ -138,7 +138,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations):
                 gaussians.update_learning_rate(iteration)
 
             if pipe.brdf and pipe.brdf_mode=="envmap":
-                gaussians.brdf_mlp.clamp_(min=0.0, max=1.0)
+                gaussians.brdf_mlp.clamp_(min=0.0, max=10.0)
 
 def prepare_output_and_logger(args):    
     if not args.model_path:
