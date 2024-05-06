@@ -17,7 +17,7 @@ from gaussian_renderer import render, network_gui, render_lighting
 import sys
 from scene import Scene, GaussianModel
 from utils.general_utils import safe_state
-from utils.image_utils import apply_depth_colormap
+from utils.image_utils import apply_depth_colormap, srgb2linear, linear2srgb
 import uuid
 from tqdm import tqdm
 from utils.image_utils import psnr
@@ -115,7 +115,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations):
 
             # Log and save
             losses_extra['psnr'] = psnr(image, gt_image).mean()
-            training_report(tb_writer, iteration, Ll1, loss, losses_extra, l1_loss, iter_start.elapsed_time(iter_end), testing_iterations, scene, render, (pipe, background))
+            training_report(tb_writer, iteration, Ll1, loss, losses_extra, l1_loss, iter_start.elapsed_time(iter_end), testing_iterations, dataset.linear, scene, render, (pipe, background))
             if (iteration in saving_iterations):
                 print("\n[ITER {}] Saving Gaussians".format(iteration))
                 scene.save(iteration)
@@ -162,7 +162,7 @@ def prepare_output_and_logger(args):
         print("Tensorboard not available: not logging progress")
     return tb_writer
 
-def training_report(tb_writer, iteration, Ll1, loss, losses_extra, l1_loss, elapsed, testing_iterations, scene : Scene, renderFunc, renderArgs):
+def training_report(tb_writer, iteration, Ll1, loss, losses_extra, l1_loss, elapsed, testing_iterations, linear, scene : Scene, renderFunc, renderArgs):
     if tb_writer:
         tb_writer.add_scalar('train_loss_patches/l1_loss', Ll1.item(), iteration)
         tb_writer.add_scalar('train_loss_patches/total_loss', loss.item(), iteration)
@@ -184,6 +184,9 @@ def training_report(tb_writer, iteration, Ll1, loss, losses_extra, l1_loss, elap
                     render_pkg = renderFunc(viewpoint, scene.gaussians, *renderArgs)
                     image = torch.clamp(render_pkg["render"], 0.0, 1.0)
                     gt_image = torch.clamp(viewpoint.original_image.to("cuda"), 0.0, 1.0)
+                    if linear:
+                        image = linear2srgb(image)
+                        gt_image = linear2srgb(gt_image)
                     images = torch.cat((images, image.unsqueeze(0)), dim=0)
                     gts = torch.cat((gts, gt_image.unsqueeze(0)), dim=0)
                     if tb_writer and (idx < 5):
@@ -199,6 +202,8 @@ def training_report(tb_writer, iteration, Ll1, loss, losses_extra, l1_loss, elap
                             elif k == "alpha":
                                 image_k = apply_depth_colormap(render_pkg[k][0][...,None], min=0., max=1.)
                                 image_k = image_k.permute(2,0,1)
+                            elif k in ["albedo", "diffuse", "diffuse_color", "specular_color", "specular"] and linear:
+                                image_k = linear2srgb(render_pkg[k][0])
                             else:
                                 if "normal" in k:
                                     render_pkg[k] = 0.5 + (0.5*render_pkg[k]) # (-1, 1) -> (0, 1)
