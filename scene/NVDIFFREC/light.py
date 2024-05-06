@@ -172,88 +172,138 @@ class EnvironmentLight(torch.nn.Module):
     #     rgb = specular_linear + diffuse_linear
 
     #     return rgb, extras
-    
-    def shade(self, gb_pos, gb_normal, albedo, metallic, kr, view_pos, specular=True):
-        """
 
-        Physical based shading
-
-        Args:
-            gb_pos: position
-            gb_normal: normal
-            kd: albedo
-            metallic: metallic
-            kr: roughness
-        """
+    def shade(self, gb_pos, gb_normal, kd, metallic, kr, albedo, view_pos, specular=True):
         # (H, W, N, C)
-        def _fresnel_schilick_roughness(cos_theta, F0, roughness):
-            weight = torch.pow(torch.clamp(cos_theta, 0.0, 1.0), 5.0)
-            return F0 + (torch.max(1.0 - roughness, F0) - F0) * weight
-        
-        
         wo = util.safe_normalize(view_pos - gb_pos)
 
         if specular:
-            diffuse_raw = albedo
+            diffuse_raw = kd
             roughness = kr
-            F0 = (1.0 - metallic) * 0.04 + albedo * metallic # F0
+            spec_col  = (1 - metallic) * 0.04 + albedo * metallic
+            diff_col  = albedo * (1 - metallic)
         else:
             raise NotImplementedError
 
         reflvec = util.safe_normalize(util.reflect(wo, gb_normal))
         nrmvec = gb_normal
-        if self.mtx is not None:  # Rotate lookup
-            mtx = torch.as_tensor(self.mtx, dtype=torch.float32, device="cuda")
-            reflvec = ru.xfm_vectors(
-                reflvec.view(reflvec.shape[0], reflvec.shape[1] * reflvec.shape[2], reflvec.shape[3]), mtx
-            ).view(*reflvec.shape)
-            nrmvec = ru.xfm_vectors(
-                nrmvec.view(nrmvec.shape[0], nrmvec.shape[1] * nrmvec.shape[2], nrmvec.shape[3]), mtx
-            ).view(*nrmvec.shape)
+        if self.mtx is not None: # Rotate lookup
+            mtx = torch.as_tensor(self.mtx, dtype=torch.float32, device='cuda')
+            reflvec = ru.xfm_vectors(reflvec.view(reflvec.shape[0], reflvec.shape[1] * reflvec.shape[2], reflvec.shape[3]), mtx).view(*reflvec.shape)
+            nrmvec  = ru.xfm_vectors(nrmvec.view(nrmvec.shape[0], nrmvec.shape[1] * nrmvec.shape[2], nrmvec.shape[3]), mtx).view(*nrmvec.shape)
 
-        ambient = dr.texture(self.diffuse[None, ...], nrmvec.contiguous(), filter_mode="linear", boundary_mode="cube")
+        ambient = dr.texture(self.diffuse[None, ...], nrmvec.contiguous(), filter_mode='linear', boundary_mode='cube')
         # specular_linear = ambient * specular_tint
-
-        F = _fresnel_schilick_roughness(torch.clamp(util.dot(wo, gb_normal), min=1e-4), F0, roughness)    
-        kd = (1.0 - F) * (1.0 - metallic)       
-        diffuse_linear = ambient * albedo * kd * torch.pi
+        specular_linear = ambient * diff_col
 
         if specular:
             # Lookup FG term from lookup texture
             NdotV = torch.clamp(util.dot(wo, gb_normal), min=1e-4)
             fg_uv = torch.cat((NdotV, roughness), dim=-1)
-            if not hasattr(self, "_FG_LUT"):
-                self._FG_LUT = torch.as_tensor(
-                    np.fromfile("scene/NVDIFFREC/irrmaps/bsdf_256_256.bin", dtype=np.float32).reshape(1, 256, 256, 2),
-                    dtype=torch.float32,
-                    device="cuda",
-                )
-            fg_lookup = dr.texture(self._FG_LUT, fg_uv, filter_mode="linear", boundary_mode="clamp")
+            if not hasattr(self, '_FG_LUT'):
+                self._FG_LUT = torch.as_tensor(np.fromfile('scene/NVDIFFREC/irrmaps/bsdf_256_256.bin', dtype=np.float32).reshape(1, 256, 256, 2), dtype=torch.float32, device='cuda')
+            fg_lookup = dr.texture(self._FG_LUT, fg_uv, filter_mode='linear', boundary_mode='clamp')
 
             # Roughness adjusted specular env lookup
             miplevel = self.get_mip(roughness)
-            spec = dr.texture(
-                self.specular[0][None, ...],
-                reflvec.contiguous(),
-                mip=list(m[None, ...] for m in self.specular[1:]),
-                mip_level_bias=miplevel[..., 0],
-                filter_mode="linear-mipmap-linear",
-                boundary_mode="cube",
-            )
+            spec = dr.texture(self.specular[0][None, ...], reflvec.contiguous(), mip=list(m[None, ...] for m in self.specular[1:]), mip_level_bias=miplevel[..., 0], filter_mode='linear-mipmap-linear', boundary_mode='cube')
 
             # Compute aggregate lighting
             # reflectance = specular_tint * fg_lookup[...,0:1] + fg_lookup[...,1:2]
-            reflectance = F0 * fg_lookup[..., 0:1] + fg_lookup[..., 1:2]      # Ks
-            specular_linear = spec * reflectance
-            
+            reflectance = spec_col * fg_lookup[...,0:1] + fg_lookup[...,1:2]
+            specular_linear += spec * reflectance
         extras = {"specular": specular_linear}
 
-        # diffuse_linear = torch.sigmoid(diffuse_raw - np.log(3.0))
+        diffuse_linear = torch.sigmoid(diffuse_raw - np.log(3.0))
         extras["diffuse"] = diffuse_linear
 
         rgb = specular_linear + diffuse_linear
 
         return rgb, extras
+    
+    
+    # def shade(self, gb_pos, gb_normal, kd, kr, albedo, ks, view_pos, specular=True):
+    #     """
+
+    #     Physical based shading
+
+    #     Args:
+    #         gb_pos: position
+    #         gb_normal: normal
+    #         kd: albedo
+    #         metallic: metallic
+    #         kr: roughness
+    #     """
+    #     # (H, W, N, C)
+    #     def _fresnel_schilick_roughness(cos_theta, F0, roughness):
+    #         weight = torch.pow(torch.clamp(cos_theta, 0.0, 1.0), 5.0)
+    #         return F0 + (torch.max(1.0 - roughness, F0) - F0) * weight
+        
+        
+    #     wo = util.safe_normalize(view_pos - gb_pos)
+
+    #     if specular:
+    #         diffuse_raw = kd
+    #         roughness = kr
+            
+    #         F0 = (1.0 - metallic) * 0.04 + albedo * metallic # F0
+    #     else:
+    #         raise NotImplementedError
+
+    #     reflvec = util.safe_normalize(util.reflect(wo, gb_normal))
+    #     nrmvec = gb_normal
+    #     if self.mtx is not None:  # Rotate lookup
+    #         mtx = torch.as_tensor(self.mtx, dtype=torch.float32, device="cuda")
+    #         reflvec = ru.xfm_vectors(
+    #             reflvec.view(reflvec.shape[0], reflvec.shape[1] * reflvec.shape[2], reflvec.shape[3]), mtx
+    #         ).view(*reflvec.shape)
+    #         nrmvec = ru.xfm_vectors(
+    #             nrmvec.view(nrmvec.shape[0], nrmvec.shape[1] * nrmvec.shape[2], nrmvec.shape[3]), mtx
+    #         ).view(*nrmvec.shape)
+
+    #     ambient = dr.texture(self.diffuse[None, ...], nrmvec.contiguous(), filter_mode="linear", boundary_mode="cube")
+    #     # specular_linear = ambient * specular_tint
+
+    #     F = _fresnel_schilick_roughness(torch.clamp(util.dot(wo, gb_normal), min=1e-4), F0, roughness)    
+    #     kd = (1.0 - F) * (1.0 - metallic)       
+    #     diffuse_linear = ambient * albedo * kd * torch.pi
+
+    #     if specular:
+    #         # Lookup FG term from lookup texture
+    #         NdotV = torch.clamp(util.dot(wo, gb_normal), min=1e-4)
+    #         fg_uv = torch.cat((NdotV, roughness), dim=-1)
+    #         if not hasattr(self, "_FG_LUT"):
+    #             self._FG_LUT = torch.as_tensor(
+    #                 np.fromfile("scene/NVDIFFREC/irrmaps/bsdf_256_256.bin", dtype=np.float32).reshape(1, 256, 256, 2),
+    #                 dtype=torch.float32,
+    #                 device="cuda",
+    #             )
+    #         fg_lookup = dr.texture(self._FG_LUT, fg_uv, filter_mode="linear", boundary_mode="clamp")
+
+    #         # Roughness adjusted specular env lookup
+    #         miplevel = self.get_mip(roughness)
+    #         spec = dr.texture(
+    #             self.specular[0][None, ...],
+    #             reflvec.contiguous(),
+    #             mip=list(m[None, ...] for m in self.specular[1:]),
+    #             mip_level_bias=miplevel[..., 0],
+    #             filter_mode="linear-mipmap-linear",
+    #             boundary_mode="cube",
+    #         )
+
+    #         # Compute aggregate lighting
+    #         # reflectance = specular_tint * fg_lookup[...,0:1] + fg_lookup[...,1:2]
+    #         reflectance = F0 * fg_lookup[..., 0:1] + fg_lookup[..., 1:2]      # Ks
+    #         specular_linear = spec * reflectance
+            
+    #     extras = {"specular": specular_linear}
+
+    #     # diffuse_linear = torch.sigmoid(diffuse_raw - np.log(3.0))
+    #     extras["diffuse"] = diffuse_linear
+
+    #     rgb = specular_linear + diffuse_linear
+
+    #     return rgb, extras
 
 
 ######################################################################################
