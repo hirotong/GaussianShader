@@ -142,6 +142,7 @@ class GaussianRasterizationSettings(NamedTuple):
     sh_degree : int
     campos : torch.Tensor
     prefiltered : bool
+    debug: bool
 
 class GaussianRasterizer(nn.Module):
     def __init__(self, raster_settings):
