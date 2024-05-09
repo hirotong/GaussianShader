@@ -137,7 +137,7 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
                 roughness = pc.get_roughness # (N, 1) 
                 metallic = pc.get_metallic # (N, 1)
                 albedo = pc.get_albedo # (N, 3)
-                color, brdf_pkg = pc.brdf_mlp.shade(gb_pos[None, None, ...], normal[None, None, ...], diffuse[None, None, ...], metallic[None, None, ...], roughness[None, None, ...],  albedo[None, None, ...], view_pos[None, None, ...])
+                color, brdf_pkg = pc.brdf_mlp.shade(gb_pos[None, None, ...], normal[None, None, ...], diffuse[None, None, ...], roughness[None, None, ...], specular[None, None, ...], albedo[None, None, ...],  metallic[None, None, ...], view_pos[None, None, ...])
 
                 colors_precomp = color.squeeze() # (N, 3) 
                 diffuse_color = brdf_pkg['diffuse'].squeeze() # (N, 3) 
