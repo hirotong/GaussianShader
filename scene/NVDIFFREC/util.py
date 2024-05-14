@@ -11,7 +11,7 @@ import os
 import numpy as np
 import torch
 import nvdiffrast.torch as dr
-import imageio
+import imageio.v2 as imageio
 
 #----------------------------------------------------------------------------
 # Vector operations
