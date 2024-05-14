@@ -1,10 +1,10 @@
 # Copyright (C) 2020, Inria
 # GRAPHDECO research group, https://team.inria.fr/graphdeco
 # All rights reserved.
-# 
-# This software is free for non-commercial, research and evaluation use 
+#
+# This software is free for non-commercial, research and evaluation use
 # under the terms of the LICENSE.md file.
-# 
+#
 # For inquiries contact sibr@inria.fr and/or George.Drettakis@inria.fr
 
 
@@ -14,17 +14,20 @@
 import os
 from enum import Enum, unique
 
+
 @unique
 class DatasetType(Enum):
-    SIBR = 'sibr'
-    COLMAP = 'colmap'
-    CAPREAL = 'capreal'
+    SIBR = "sibr"
+    COLMAP = "colmap"
+    CAPREAL = "capreal"
 
-datasetStructure = { 
-    "colmap": [ "colmap", "colmap/stereo", "colmap/sparse" ],
-    "capreal": [ "capreal", "capreal/undistorted" ],
-    "sibr": [ "cameras", "images", "meshes" ]
+
+datasetStructure = {
+    "colmap": ["colmap", "colmap/stereo", "colmap/sparse"],
+    "capreal": ["capreal", "capreal/undistorted"],
+    "sibr": ["cameras", "images", "meshes"],
 }
+
 
 def buildDatasetStructure(path, types):
     for folder in [folder for type in types for folder in datasetStructure[type]]:
