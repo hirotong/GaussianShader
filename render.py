@@ -30,17 +30,24 @@ def render_lightings(model_path, name, iteration, gaussians, sample_num):
     lighting_path = os.path.join(model_path, name, "ours_{}".format(iteration))
     makedirs(lighting_path, exist_ok=True)
     # sampled_indicies = torch.randperm(gaussians.get_xyz.shape[0])[:sample_num]
-    sampled_indicies = torch.arange(gaussians.get_xyz.shape[0], dtype=torch.long)[:sample_num]
+    sampled_indicies = torch.arange(gaussians.get_xyz.shape[0], dtype=torch.long)[
+        :sample_num
+    ]
     for sampled_index in tqdm(sampled_indicies, desc="Rendering lighting progress"):
         lighting = render_lighting(gaussians, sampled_index=sampled_index)
-        torchvision.utils.save_image(lighting, os.path.join(lighting_path, "{0:05d}".format(sampled_index) + ".png"))
+        torchvision.utils.save_image(
+            lighting,
+            os.path.join(lighting_path, "{0:05d}".format(sampled_index) + ".png"),
+        )
         save_image_raw(
             os.path.join(lighting_path, "{0:05d}".format(sampled_index) + ".hdr"),
             lighting.permute(1, 2, 0).detach().cpu().numpy(),
         )
 
 
-def render_set(model_path, name, iteration, views, gaussians, pipeline, background, linear=False):
+def render_set(
+    model_path, name, iteration, views, gaussians, pipeline, background, linear=False
+):
     render_path = os.path.join(model_path, name, "ours_{}".format(iteration), "renders")
     gts_path = os.path.join(model_path, name, "ours_{}".format(iteration), "gt")
 
@@ -57,37 +64,58 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
         gt = view.original_image[0:3, :, :]
         if linear:
             torchvision.utils.save_image(
-                linear2srgb(render_pkg["render"]), os.path.join(render_path, "{0:05d}".format(idx) + ".png")
+                linear2srgb(render_pkg["render"]),
+                os.path.join(render_path, "{0:05d}".format(idx) + ".png"),
             )
-            torchvision.utils.save_image(linear2srgb(gt), os.path.join(gts_path, "{0:05d}".format(idx) + ".png"))
+            torchvision.utils.save_image(
+                linear2srgb(gt), os.path.join(gts_path, "{0:05d}".format(idx) + ".png")
+            )
         else:
             torchvision.utils.save_image(
-                render_pkg["render"], os.path.join(render_path, "{0:05d}".format(idx) + ".png")
+                render_pkg["render"],
+                os.path.join(render_path, "{0:05d}".format(idx) + ".png"),
             )
-            torchvision.utils.save_image(gt, os.path.join(gts_path, "{0:05d}".format(idx) + ".png"))
+            torchvision.utils.save_image(
+                gt, os.path.join(gts_path, "{0:05d}".format(idx) + ".png")
+            )
         for k in render_pkg.keys():
             if render_pkg[k].dim() < 3 or k == "render" or k == "delta_normal_norm":
                 continue
             save_path = os.path.join(model_path, name, "ours_{}".format(iteration), k)
             makedirs(save_path, exist_ok=True)
             if k == "alpha":
-                render_pkg[k] = apply_depth_colormap(render_pkg["alpha"][0][..., None], min=0.0, max=1.0).permute(
-                    2, 0, 1
-                )
+                render_pkg[k] = apply_depth_colormap(
+                    render_pkg["alpha"][0][..., None], min=0.0, max=1.0
+                ).permute(2, 0, 1)
             if k == "depth":
-                render_pkg[k] = apply_depth_colormap(-render_pkg["depth"][0][..., None]).permute(2, 0, 1)
+                render_pkg[k] = apply_depth_colormap(
+                    -render_pkg["depth"][0][..., None]
+                ).permute(2, 0, 1)
             elif k in ["diffuse", "specular_color", "albedo", "diffuse_color"]:
                 render_pkg[k] = linear2srgb(render_pkg[k])
             elif "normal" in k:
                 render_pkg[k] = 0.5 + (0.5 * render_pkg[k])
-            torchvision.utils.save_image(render_pkg[k], os.path.join(save_path, "{0:05d}".format(idx) + ".png"))
-        keys = ["render", "diffuse", "diffuse_color", "specular", "specular_color", "roughness", "albedo", "metallic"]
+            torchvision.utils.save_image(
+                render_pkg[k], os.path.join(save_path, "{0:05d}".format(idx) + ".png")
+            )
+        keys = [
+            "render",
+            "diffuse",
+            "diffuse_color",
+            "specular",
+            "specular_color",
+            "roughness",
+            "albedo",
+            "metallic",
+        ]
         concat_image = [gt]
         for key in keys:
             if key in render_pkg.keys():
                 concat_image.append(render_pkg[key])
         concat_image = torchvision.utils.make_grid(concat_image, nrow=1)
-        save_path = os.path.join(model_path, name, "ours_{}".format(iteration), "compare")
+        save_path = os.path.join(
+            model_path, name, "ours_{}".format(iteration), "compare"
+        )
         makedirs(save_path, exist_ok=True)
         torchvision.utils.save_image(
             concat_image,
@@ -95,9 +123,20 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
         )
 
 
-def render_sets(dataset: ModelParams, iteration: int, pipeline: PipelineParams, skip_train: bool, skip_test: bool):
+def render_sets(
+    dataset: ModelParams,
+    iteration: int,
+    pipeline: PipelineParams,
+    skip_train: bool,
+    skip_test: bool,
+):
     with torch.no_grad():
-        gaussians = GaussianModel(dataset.sh_degree, dataset.brdf_dim, pipeline.brdf_mode, dataset.brdf_envmap_res)
+        gaussians = GaussianModel(
+            dataset.sh_degree,
+            dataset.brdf_dim,
+            pipeline.brdf_mode,
+            dataset.brdf_envmap_res,
+        )
         scene = Scene(dataset, gaussians, load_iteration=iteration, shuffle=False)
 
         bg_color = [1, 1, 1] if dataset.white_background else [0, 0, 0]
@@ -128,7 +167,13 @@ def render_sets(dataset: ModelParams, iteration: int, pipeline: PipelineParams, 
             )
 
         if pipeline.brdf:
-            render_lightings(dataset.model_path, "lighting", scene.loaded_iter, gaussians, sample_num=1)
+            render_lightings(
+                dataset.model_path,
+                "lighting",
+                scene.loaded_iter,
+                gaussians,
+                sample_num=1,
+            )
 
 
 if __name__ == "__main__":
@@ -146,4 +191,10 @@ if __name__ == "__main__":
     # Initialize system state (RNG)
     safe_state(args.quiet)
 
-    render_sets(model.extract(args), args.iteration, pipeline.extract(args), args.skip_train, args.skip_test)
+    render_sets(
+        model.extract(args),
+        args.iteration,
+        pipeline.extract(args),
+        args.skip_train,
+        args.skip_test,
+    )
