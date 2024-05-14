@@ -26,8 +26,8 @@ from scene.gaussian_model import BasicPointCloud
 
 class CameraInfo(NamedTuple):
     uid: int
-    R: np.array
-    T: np.array
+    R: np.array     # w2c but transposed
+    T: np.array     # w2c
     FovY: np.array
     FovX: np.array
     image: np.array
