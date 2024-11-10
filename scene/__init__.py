@@ -60,6 +60,15 @@ class Scene:
             scene_info = sceneLoadTypeCallbacks["Blender"](
                 args.source_path, args.white_background, args.eval, linear=args.linear
             )
+        elif os.path.exists(os.path.join(args.source_path, "0-camera.pkl")):
+            self.scene_type = "NeROSync"
+            scene_info = sceneLoadTypeCallbacks["NeROSync"](
+                args.source_path,
+                args.white_background,
+                args.eval,
+                load_priors=args.load_priors,
+                train_num_images=args.train_num_images if hasattr(args, "train_num_images") else -1,
+            )
         else:
             assert False, "Could not recognize scene type!"
 

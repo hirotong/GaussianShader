@@ -9,11 +9,13 @@
 # For inquiries contact  george.drettakis@inria.fr
 #
 
-import torch
+import pickle
+import random
 import sys
 from datetime import datetime
+
 import numpy as np
-import random
+import torch
 
 
 def inverse_sigmoid(x):
@@ -34,9 +36,7 @@ def get_const_lr_func(const):
         return const
 
 
-def get_expon_lr_func(
-    lr_init, lr_final, lr_delay_steps=0, lr_delay_mult=1.0, max_steps=1000000
-):
+def get_expon_lr_func(lr_init, lr_final, lr_delay_steps=0, lr_delay_mult=1.0, max_steps=1000000):
     """
     Copied from Plenoxels
 
@@ -87,9 +87,7 @@ def strip_symmetric(sym):
 
 
 def build_rotation(r):
-    norm = torch.sqrt(
-        r[:, 0] * r[:, 0] + r[:, 1] * r[:, 1] + r[:, 2] * r[:, 2] + r[:, 3] * r[:, 3]
-    )
+    norm = torch.sqrt(r[:, 0] * r[:, 0] + r[:, 1] * r[:, 1] + r[:, 2] * r[:, 2] + r[:, 3] * r[:, 3])
 
     q = r / norm[:, None]
 
@@ -137,9 +135,7 @@ def safe_state(silent):
                     old_f.write(
                         x.replace(
                             "\n",
-                            " [{}]\n".format(
-                                str(datetime.now().strftime("%d/%m %H:%M:%S"))
-                            ),
+                            " [{}]\n".format(str(datetime.now().strftime("%d/%m %H:%M:%S"))),
                         )
                     )
                 else:
@@ -159,9 +155,7 @@ def safe_state(silent):
 def get_minimum_axis(scales, rotations):
     sorted_idx = torch.argsort(scales, descending=False, dim=-1)
     R = build_rotation(rotations)
-    R_sorted = torch.gather(
-        R, dim=2, index=sorted_idx[:, None, :].repeat(1, 3, 1)
-    ).squeeze()
+    R_sorted = torch.gather(R, dim=2, index=sorted_idx[:, None, :].repeat(1, 3, 1)).squeeze()
     x_axis = R_sorted[:, 0, :]  # normalized by defaut
 
     return x_axis
@@ -173,3 +167,8 @@ def flip_align_view(normal, viewdir):
     non_flip = dotprod >= 0  # (N, 1)
     normal_flipped = normal * torch.where(non_flip, 1, -1)  # (N, 3)
     return normal_flipped, non_flip
+
+
+def read_pickle(pkl_path):
+    with open(pkl_path, "rb") as f:
+        return pickle.load(f)

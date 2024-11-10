@@ -13,15 +13,12 @@ import os
 
 import kiui
 import numpy as np
-from utils.general_utils import inverse_sigmoid, get_expon_lr_func, build_rotation, get_const_lr_func
-from torch import nn
-import os
-from utils.system_utils import mkdir_p
+import open3d as o3d
+import torch
 from plyfile import PlyData, PlyElement
 from simple_knn._C import distCUDA2
-from utils.graphics_utils import BasicPointCloud
-from utils.general_utils import strip_symmetric, build_scaling_rotation, get_minimum_axis, flip_align_view
-import open3d as o3d
+from torch import nn
+
 from scene.NVDIFFREC import create_trainable_env_rnd, load_env
 from utils.general_utils import (
     build_rotation,
@@ -34,9 +31,10 @@ from utils.general_utils import (
     strip_symmetric,
 )
 from utils.graphics_utils import BasicPointCloud
+from utils.mesh_utils import clean_mesh, decimate_mesh
 from utils.sh_utils import RGB2SH
 from utils.system_utils import mkdir_p
-from utils.mesh_utils import clean_mesh, decimate_mesh
+
 
 def gaussian_3d_coeff(xyzs, covs):
     # xyzs: [N, 3]
